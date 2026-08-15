@@ -1,0 +1,23 @@
+{
+  "name": "defectdojo-report",
+  "displayName": "DefectDojo Report",
+  "version": "1.0.0",
+  "description": "Produce executive, program, and remediation-trend security reports from DefectDojo Pro insights data, or generate a native DefectDojo report artifact for download. Requires DefectDojo Pro.",
+  "author": {
+    "name": "DefectDojo Inc.",
+    "url": "https://defectdojo.com"
+  },
+  "homepage": "https://docs.defectdojo.com",
+  "repository": "https://github.com/DefectDojo/agent-skills",
+  "license": "LicenseRef-DefectDojo-Agent-Skills",
+  "keywords": [
+    "defectdojo",
+    "reporting",
+    "metrics",
+    "executive",
+    "security"
+  ],
+  "dependencies": [
+    "defectdojo-connect"
+  ]
+}

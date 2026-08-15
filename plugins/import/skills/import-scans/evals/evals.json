@@ -1,0 +1,23 @@
+{
+  "skill": "import-scans",
+  "evals": [
+    {
+      "id": "import-recurring-uses-reimport",
+      "eval_name": "Recurring scan uses reimport",
+      "prompt": "Here is today's semgrep.json from our nightly scan, put it in Dojo.",
+      "expected_output": "Chooses reimport rather than import because the scan is recurring, and explains in one sentence that reimport closes findings that no longer appear and reactivates ones that came back. Uses the exact scan_type string Semgrep JSON Report."
+    },
+    {
+      "id": "import-async-trap",
+      "eval_name": "Background import is not reported as finished",
+      "prompt": "Import this Trivy scan. [the instance processes imports in the background]",
+      "expected_output": "Branches on the background_import field in the response rather than on what was requested, waits for the test to reach Processed, and only then reports results. If polling times out, says processing is still running on the server rather than claiming success or failure."
+    },
+    {
+      "id": "import-unknown-type",
+      "eval_name": "Unknown scanner output is not guessed",
+      "prompt": "Import this results.json from a tool I do not think you have seen before.",
+      "expected_output": "Inspects the file shape, and if it cannot map it to a known scan_type with confidence, asks rather than guessing. May suggest Generic Findings Import as an explicit fallback. Does not invent a scan_type string."
+    }
+  ]
+}

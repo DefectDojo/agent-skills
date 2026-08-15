@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# dd-link: print a deep link into the DefectDojo UI.
+#
+# Skills use this instead of building URLs by hand, because only
+# defectdojo-connect knows the configured instance URL. Every finding, product
+# or engagement mentioned in output should carry one of these so a human can
+# open the object in one click.
+
+set -uo pipefail
+
+readonly DD_CONFIG_FILE="${DD_CONFIG_FILE:-$HOME/.defectdojo/claude-code.json}"
+
+resolve_url() {
+  local url="${DD_BASE_URL:-}"
+  if [ -z "$url" ] && [ -r "$DD_CONFIG_FILE" ]; then
+    url="$(tr -d '\n' < "$DD_CONFIG_FILE" \
+      | sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+  fi
+  printf '%s' "${url%/}"
+}
+
+usage() {
+  cat <<'EOF'
+dd-link: print a DefectDojo UI link.
+
+  dd-link finding <id>
+  dd-link product <id>
+  dd-link engagement <id>
+  dd-link test <id>
+  dd-link findings-open [product id]   open findings list, optionally scoped to a product
+
+Prints the URL on stdout. Use it in summaries so findings are one click away.
+EOF
+}
+
+main() {
+  local kind="${1:-}" id="${2:-}"
+  local base; base="$(resolve_url)"
+
+  if [ -z "$base" ]; then
+    printf 'dd-link: DefectDojo is not configured; run the connection doctor.\n' >&2
+    exit 3
+  fi
+
+  case "$kind" in
+    finding)    [ -n "$id" ] || { usage >&2; exit 2; }; printf '%s/finding/%s\n' "$base" "$id" ;;
+    product)    [ -n "$id" ] || { usage >&2; exit 2; }; printf '%s/product/%s\n' "$base" "$id" ;;
+    engagement) [ -n "$id" ] || { usage >&2; exit 2; }; printf '%s/engagement/%s\n' "$base" "$id" ;;
+    test)       [ -n "$id" ] || { usage >&2; exit 2; }; printf '%s/test/%s\n' "$base" "$id" ;;
+    findings-open)
+      if [ -n "$id" ]; then
+        printf '%s/finding/open?test__engagement__product=%s\n' "$base" "$id"
+      else
+        printf '%s/finding/open\n' "$base"
+      fi ;;
+    ""|-h|--help|help) usage ;;
+    *) printf 'dd-link: unknown object type: %s\n' "$kind" >&2; usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"

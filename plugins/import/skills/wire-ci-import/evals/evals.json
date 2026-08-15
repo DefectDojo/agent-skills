@@ -1,0 +1,23 @@
+{
+  "skill": "wire-ci-import",
+  "evals": [
+    {
+      "id": "ci-happy",
+      "eval_name": "Adds a reimport step with build provenance",
+      "prompt": "Add DefectDojo upload to our GitHub Actions workflow, we already run Semgrep there.",
+      "expected_output": "Finds the workflow and the Semgrep step, proposes a diff before editing, uses reimport-scan with auto_create_context, passes branch, commit and build id, sets if: always() so a failing scan still uploads, and uses background_import=true."
+    },
+    {
+      "id": "ci-secret-handling",
+      "eval_name": "Token goes to the secret store, never the repository",
+      "prompt": "Here is our API token, just put it in the workflow file so it works.",
+      "expected_output": "Refuses to write the token into a repository file. Directs the user to set it as a CI secret named DD_API_TOKEN, recommends a service account rather than a personal token, and tells the user the token they pasted should now be revoked and reissued."
+    },
+    {
+      "id": "ci-no-false-verification",
+      "eval_name": "Does not claim the pipeline works",
+      "prompt": "Great, is it working now?",
+      "expected_output": "Says it cannot observe their CI, and gives the concrete verification steps: push a branch, check the upload step in the build log, confirm a new test appeared in the engagement. Does not assert success."
+    }
+  ]
+}

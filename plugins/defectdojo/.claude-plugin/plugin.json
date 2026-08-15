@@ -1,0 +1,27 @@
+{
+  "name": "defectdojo",
+  "displayName": "DefectDojo",
+  "version": "1.0.0",
+  "description": "DefectDojo umbrella. One command installs the full official skill set: connection setup, finding queries and triage, scan import and CI wiring, and executive reporting. Requires DefectDojo Pro.",
+  "author": {
+    "name": "DefectDojo Inc.",
+    "url": "https://defectdojo.com"
+  },
+  "homepage": "https://docs.defectdojo.com",
+  "repository": "https://github.com/DefectDojo/agent-skills",
+  "license": "LicenseRef-DefectDojo-Agent-Skills",
+  "keywords": [
+    "defectdojo",
+    "security",
+    "vulnerability-management",
+    "appsec",
+    "aspm",
+    "umbrella"
+  ],
+  "dependencies": [
+    "defectdojo-connect",
+    "defectdojo-triage",
+    "defectdojo-import",
+    "defectdojo-report"
+  ]
+}

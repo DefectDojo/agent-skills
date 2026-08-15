@@ -1,0 +1,9 @@
+.DS_Store
+*.pyc
+__pycache__/
+node_modules/
+
+# Never let a real credential or a local config near this repository.
+.env
+*.pem
+claude-code.json

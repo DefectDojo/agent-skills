@@ -1,0 +1,25 @@
+{
+  "name": "defectdojo-import",
+  "displayName": "DefectDojo Import",
+  "version": "1.0.0",
+  "description": "Import scanner output and SBOMs into DefectDojo Pro with automatic product and engagement creation, correct import versus reimport handling, and background-import polling. Also wires scan upload into CI pipelines. Requires DefectDojo Pro.",
+  "author": {
+    "name": "DefectDojo Inc.",
+    "url": "https://defectdojo.com"
+  },
+  "homepage": "https://docs.defectdojo.com",
+  "repository": "https://github.com/DefectDojo/agent-skills",
+  "license": "LicenseRef-DefectDojo-Agent-Skills",
+  "keywords": [
+    "defectdojo",
+    "sast",
+    "dast",
+    "sca",
+    "sbom",
+    "ci",
+    "security"
+  ],
+  "dependencies": [
+    "defectdojo-connect"
+  ]
+}

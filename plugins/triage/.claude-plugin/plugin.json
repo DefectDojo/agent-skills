@@ -1,0 +1,23 @@
+{
+  "name": "defectdojo-triage",
+  "displayName": "DefectDojo Triage",
+  "version": "1.0.0",
+  "description": "Ask questions about DefectDojo findings, products, and security posture in plain language, then work the triage queue: close, verify, mark false positive, risk accept, tag, and annotate findings with a confirmation step before any write. Requires DefectDojo Pro.",
+  "author": {
+    "name": "DefectDojo Inc.",
+    "url": "https://defectdojo.com"
+  },
+  "homepage": "https://docs.defectdojo.com",
+  "repository": "https://github.com/DefectDojo/agent-skills",
+  "license": "LicenseRef-DefectDojo-Agent-Skills",
+  "keywords": [
+    "defectdojo",
+    "triage",
+    "findings",
+    "vulnerability-management",
+    "security"
+  ],
+  "dependencies": [
+    "defectdojo-connect"
+  ]
+}

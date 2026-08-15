@@ -1,0 +1,10 @@
+# All changes should be reviewed by someone.
+* @devGregA
+
+# The REST bridge and the credential hook carry the security-sensitive logic:
+# token handling, the Pro edition gate, and error translation. Changes here
+# deserve a closer look than the skills do.
+/plugins/connect/bin/            @devGregA
+/plugins/connect/hooks/          @devGregA
+/tests/                          @devGregA
+/.github/workflows/              @devGregA

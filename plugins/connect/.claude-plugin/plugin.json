@@ -1,0 +1,35 @@
+{
+  "name": "defectdojo-connect",
+  "displayName": "DefectDojo Connect",
+  "version": "1.0.0",
+  "description": "Connect Claude Code to a DefectDojo Pro instance. Wires the built-in MCP server, stores API credentials once, provides the dd-api REST bridge used by every other DefectDojo skill, and diagnoses broken connections. Requires DefectDojo Pro.",
+  "author": {
+    "name": "DefectDojo Inc.",
+    "url": "https://defectdojo.com"
+  },
+  "homepage": "https://docs.defectdojo.com",
+  "repository": "https://github.com/DefectDojo/agent-skills",
+  "license": "LicenseRef-DefectDojo-Agent-Skills",
+  "keywords": [
+    "defectdojo",
+    "mcp",
+    "setup",
+    "security"
+  ],
+  "mcpServers": "./.mcp.json",
+  "userConfig": {
+    "dd_url": {
+      "type": "string",
+      "title": "DefectDojo Pro instance URL",
+      "description": "Base URL of your DefectDojo Pro instance, with no trailing slash and no path. For example https://yourcompany.cloud.defectdojo.com. This plugin requires DefectDojo Pro and will refuse to run against DefectDojo open source.",
+      "required": true
+    },
+    "dd_api_token": {
+      "type": "string",
+      "title": "DefectDojo API token",
+      "description": "Your personal API v2 key, found under your user profile in DefectDojo. Stored in your operating system keychain, never shown to the model. All actions run as you, under your existing DefectDojo permissions.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

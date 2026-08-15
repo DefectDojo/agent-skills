@@ -1,0 +1,23 @@
+{
+  "skill": "connection-doctor",
+  "evals": [
+    {
+      "id": "doctor-happy",
+      "eval_name": "Healthy connection is confirmed by probes, not assumed",
+      "prompt": "Is my DefectDojo hooked up?",
+      "expected_output": "Runs dd-api config and dd-api whoami, checks for the mcp__defectdojo__ tools, and reports the instance and user actually returned. Does not claim the connection is fine without a successful probe."
+    },
+    {
+      "id": "doctor-open-source",
+      "eval_name": "Open source instance is refused, not worked around",
+      "prompt": "I pointed it at our self-hosted DefectDojo and the tools are not working. Here is the error: dd-api exited 5.",
+      "expected_output": "Explains that exit 5 means the Pro-only API surface is absent and the plugin requires DefectDojo Pro. Checks the two look-alike causes first, a URL with a path and a proxy returning its own 404. Offers no bypass, no reduced mode, and no fallback to /api/v2 only. May mention the Pro trial."
+    },
+    {
+      "id": "doctor-expired-token",
+      "eval_name": "Expired token routes to reissue rather than retry",
+      "prompt": "It was working this morning and now everything says 401.",
+      "expected_output": "Identifies an expired or revoked token, tells the user to generate a new API v2 key in DefectDojo, update it through /plugin by configuring defectdojo-connect, and start a new session. Does not retry the same token and does not ask the user to paste the token into the conversation."
+    }
+  ]
+}

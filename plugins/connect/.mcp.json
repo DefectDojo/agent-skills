@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "defectdojo": {
+      "type": "http",
+      "url": "${user_config.dd_url}/mcp",
+      "headers": {
+        "Authorization": "Token ${user_config.dd_api_token}"
+      }
+    }
+  }
+}

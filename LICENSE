@@ -1,0 +1,130 @@
+DefectDojo Agent Skills License
+
+Copyright (c) 2026 DefectDojo, Inc. All rights reserved.
+
+This software is not open source. The source is published so that customers can
+read what runs against their vulnerability data before running it.
+
+1. DEFINITIONS
+
+   "Software" means the software distributed under this license: the plugins,
+   skills, scripts, documentation and configuration that accompany this notice,
+   in whatever form and wherever the copy resides.
+
+   "DefectDojo Pro" means a DefectDojo Pro or DefectDojo SaaS instance operated
+   under a valid, current commercial subscription from DefectDojo, Inc., or
+   under an evaluation, trial or proof-of-concept arrangement authorized by
+   DefectDojo, Inc.
+
+   "You" means the individual exercising rights under this license and any
+   entity on whose behalf that individual acts. Rights exercised by an employee
+   or contractor within the scope of their work are exercised for that entity.
+
+2. WHAT YOU MAY DO
+
+   DefectDojo, Inc. grants you a non-exclusive, non-transferable right,
+   revocable only as provided in section 6, to:
+
+   (a) download, copy and install the Software, including installation through
+       a Claude Code plugin marketplace;
+
+   (b) use the Software to interact with a DefectDojo Pro instance that you are
+       authorized to use, and run the Software for internal testing and
+       evaluation, including against the test fixtures it ships with; and
+
+   (c) read and evaluate the source, including for security review, whether or
+       not you hold a subscription.
+
+3. MARKETPLACES AND DIRECTORIES
+
+   The operator of a plugin marketplace or directory through which Claude Code,
+   or a successor Anthropic product, installs plugins may host, index and
+   distribute the Software, or any individual plugin within it, for
+   installation by that marketplace's users, provided that each copy
+   distributed is unmodified, was obtained from DefectDojo's repository at
+   github.com/DefectDojo/agent-skills or from DefectDojo, Inc. directly, and
+   retains this license and all copyright and attribution notices. This
+   permission ends thirty (30) days after DefectDojo, Inc. gives the operator
+   notice of revocation.
+
+4. WHAT YOU MAY NOT DO
+
+   Except as sections 2 and 3 permit, as permitted by applicable law, or with
+   prior written permission from DefectDojo, Inc., you may not:
+
+   (a) modify the Software or create works derived from it;
+
+   (b) distribute, publish, sublicense, sell, rent or host the Software;
+
+   (c) remove, disable, circumvent or defeat the checks by which the Software
+       verifies that it is connected to DefectDojo Pro, or adapt the Software
+       to operate against any software other than DefectDojo Pro;
+
+   (d) remove or obscure any copyright, license or attribution notice; or
+
+   (e) use the names, logos or trademarks of DefectDojo, Inc. to endorse or
+       promote any product, or to identify any software other than the
+       unmodified Software. Truthful, nominative references to the Software or
+       to DefectDojo products for the purpose of identifying them, including in
+       a marketplace or directory listing, are permitted.
+
+5. RESERVATION OF RIGHTS
+
+   All rights not expressly granted in sections 2 and 3 are reserved. Nothing
+   here transfers ownership of the Software or of any intellectual property in
+   it.
+
+6. TERMINATION
+
+   The rights in section 2 end automatically if you materially breach this
+   license and do not cure the breach within thirty (30) days of notice from
+   DefectDojo, Inc., except that a breach of section 4(c) ends them
+   immediately.
+
+   The rights in sections 2(a) and 2(b) are suspended while you have no
+   DefectDojo Pro instance you are authorized to use, and resume when you next
+   do. The right in section 2(c) to read and evaluate the source survives any
+   termination or suspension.
+
+   On termination you must stop using the Software and delete the copies you
+   hold, other than copies retained under a legal or regulatory obligation and
+   copies retained solely to exercise the surviving right in section 2(c).
+
+7. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+8. LIMITATION OF LIABILITY
+
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
+   DEFECTDOJO, INC. BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+   IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+9. SEVERABILITY
+
+   If any provision of this license is held unenforceable, it applies to the
+   greatest extent the law allows, and the remaining provisions stay in full
+   effect.
+
+10. GOVERNING LAW
+
+   This license is governed by the laws of the State of Delaware, excluding
+   its conflict-of-laws rules. The state and federal courts located in
+   Delaware have exclusive jurisdiction over any dispute arising out of or
+   relating to this license, and you consent to their jurisdiction, except
+   that DefectDojo, Inc. may seek injunctive relief in any court of competent
+   jurisdiction.
+
+11. OTHER AGREEMENTS AND OTHER SOFTWARE
+
+   If you have a written agreement with DefectDojo, Inc. covering the Software,
+   that agreement controls where it conflicts with this license.
+
+   DefectDojo Community Edition is licensed separately, under its own open
+   source license. This license does not apply to it.
+
+Permissions beyond this license: legal@defectdojo.com

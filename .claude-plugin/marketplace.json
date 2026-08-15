@@ -1,0 +1,101 @@
+{
+  "name": "defectdojo",
+  "description": "Official DefectDojo skills for Claude Code. Query, triage, import, and report on your DefectDojo Pro vulnerability data from the terminal. Requires DefectDojo Pro.",
+  "owner": {
+    "name": "DefectDojo Inc.",
+    "url": "https://defectdojo.com"
+  },
+  "plugins": [
+    {
+      "name": "defectdojo",
+      "source": "./plugins/defectdojo",
+      "category": "security",
+      "description": "DefectDojo umbrella. One command installs the full official skill set: connection setup, finding queries and triage, scan import and CI wiring, and executive reporting. Requires DefectDojo Pro.",
+      "author": {
+        "name": "DefectDojo Inc."
+      },
+      "homepage": "https://github.com/DefectDojo/agent-skills",
+      "license": "LicenseRef-DefectDojo-Agent-Skills",
+      "keywords": [
+        "defectdojo",
+        "security",
+        "vulnerability-management",
+        "appsec",
+        "aspm"
+      ]
+    },
+    {
+      "name": "defectdojo-connect",
+      "source": "./plugins/connect",
+      "category": "security",
+      "description": "Connect Claude Code to a DefectDojo Pro instance. Wires the built-in MCP server, stores API credentials once, provides the dd-api REST bridge used by every other DefectDojo skill, and diagnoses broken connections. Requires DefectDojo Pro.",
+      "author": {
+        "name": "DefectDojo Inc."
+      },
+      "homepage": "https://github.com/DefectDojo/agent-skills/tree/main/plugins/connect",
+      "license": "LicenseRef-DefectDojo-Agent-Skills",
+      "keywords": [
+        "defectdojo",
+        "mcp",
+        "setup",
+        "security"
+      ]
+    },
+    {
+      "name": "defectdojo-triage",
+      "source": "./plugins/triage",
+      "category": "security",
+      "description": "Ask questions about DefectDojo findings, products, and security posture in plain language, then work the triage queue: close, verify, mark false positive, risk accept, tag, and annotate findings with a confirmation step before any write. Requires DefectDojo Pro.",
+      "author": {
+        "name": "DefectDojo Inc."
+      },
+      "homepage": "https://github.com/DefectDojo/agent-skills/tree/main/plugins/triage",
+      "license": "LicenseRef-DefectDojo-Agent-Skills",
+      "keywords": [
+        "defectdojo",
+        "triage",
+        "findings",
+        "vulnerability-management",
+        "security"
+      ]
+    },
+    {
+      "name": "defectdojo-import",
+      "source": "./plugins/import",
+      "category": "security",
+      "description": "Import scanner output and SBOMs into DefectDojo Pro with automatic product and engagement creation, correct import versus reimport handling, and background-import polling. Also wires scan upload into CI pipelines. Requires DefectDojo Pro.",
+      "author": {
+        "name": "DefectDojo Inc."
+      },
+      "homepage": "https://github.com/DefectDojo/agent-skills/tree/main/plugins/import",
+      "license": "LicenseRef-DefectDojo-Agent-Skills",
+      "keywords": [
+        "defectdojo",
+        "sast",
+        "dast",
+        "sca",
+        "sbom",
+        "ci",
+        "security"
+      ]
+    },
+    {
+      "name": "defectdojo-report",
+      "source": "./plugins/report",
+      "category": "security",
+      "description": "Produce executive, program, and remediation-trend security reports from DefectDojo Pro insights data, or generate a native DefectDojo report artifact for download. Requires DefectDojo Pro.",
+      "author": {
+        "name": "DefectDojo Inc."
+      },
+      "homepage": "https://github.com/DefectDojo/agent-skills/tree/main/plugins/report",
+      "license": "LicenseRef-DefectDojo-Agent-Skills",
+      "keywords": [
+        "defectdojo",
+        "reporting",
+        "metrics",
+        "executive",
+        "security"
+      ]
+    }
+  ]
+}

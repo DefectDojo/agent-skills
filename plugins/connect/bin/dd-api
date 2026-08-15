@@ -1,0 +1,507 @@
+#!/usr/bin/env bash
+# dd-api: the single REST entry point for every DefectDojo Claude Code skill.
+#
+# Everything that talks to the DefectDojo REST API goes through here so that
+# credential handling, the Pro edition gate, auth-header format, error
+# translation and background-import polling are implemented exactly once.
+#
+# Exit codes are contractual. Skills branch on them:
+#   0  success
+#   2  usage error (bad arguments)
+#   3  not configured (no URL or token available)
+#   4  authentication rejected (401) or forbidden (403)
+#   5  instance is not DefectDojo Pro, or the Pro API surface is unreachable
+#   6  HTTP error from DefectDojo (4xx/5xx other than 401/403)
+#   7  background import did not reach a terminal state before the timeout
+#
+# The API token is never printed, never echoed, and never passed on the command
+# line where it would be visible to `ps`. Verbose mode redacts it.
+
+set -uo pipefail
+
+readonly DD_CONFIG_FILE="${DD_CONFIG_FILE:-$HOME/.defectdojo/claude-code.json}"
+readonly DD_CACHE_DIR="${DD_CACHE_DIR:-$HOME/.defectdojo/cache}"
+readonly EX_USAGE=2 EX_NOCONFIG=3 EX_AUTH=4 EX_NOTPRO=5 EX_HTTP=6 EX_TIMEOUT=7
+
+DD_URL=""
+DD_TOKEN=""
+DD_TOKEN_SOURCE=""
+VERBOSE=0
+
+die() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
+log() { [ "$VERBOSE" -eq 1 ] && printf 'dd-api: %s\n' "$1" >&2; return 0; }
+
+# --------------------------------------------------------------------------
+# Configuration
+# --------------------------------------------------------------------------
+
+# Resolution order, highest priority first:
+#   1. DD_URL / DD_API_TOKEN environment variables (CI, or users who refuse
+#      any on-disk copy of the credential)
+#   2. the config file written by the SessionStart hook from plugin settings
+# Anything else is a hard error pointing at the connection doctor.
+load_config() {
+  if [ -n "${DD_API_TOKEN:-}" ]; then
+    DD_TOKEN="$DD_API_TOKEN"
+    DD_TOKEN_SOURCE="DD_API_TOKEN environment variable"
+  fi
+  if [ -n "${DD_URL_OVERRIDE:-}" ]; then
+    DD_URL="$DD_URL_OVERRIDE"
+  elif [ -n "${DD_BASE_URL:-}" ]; then
+    DD_URL="$DD_BASE_URL"
+  fi
+
+  if [ -r "$DD_CONFIG_FILE" ]; then
+    if [ -z "$DD_URL" ]; then
+      DD_URL="$(json_field "$(cat "$DD_CONFIG_FILE")" url)"
+    fi
+    if [ -z "$DD_TOKEN" ]; then
+      DD_TOKEN="$(json_field "$(cat "$DD_CONFIG_FILE")" token)"
+      [ -n "$DD_TOKEN" ] && DD_TOKEN_SOURCE="$DD_CONFIG_FILE"
+    fi
+  fi
+
+  DD_URL="${DD_URL%/}"
+
+  if [ -z "$DD_URL" ] || [ -z "$DD_TOKEN" ]; then
+    cat >&2 <<'EOF'
+dd-api: DefectDojo is not configured for this session.
+
+The plugin stores your instance URL and API token when you enable it. If you
+have not done that yet, or the values are wrong, open the plugin manager with
+/plugin, configure defectdojo-connect, then start a new session so the
+credentials are picked up.
+
+To configure by environment instead (useful in CI), set both:
+  DD_BASE_URL=https://your-instance.example.com
+  DD_API_TOKEN=<your DefectDojo API v2 key>
+
+Run the connection doctor for a guided diagnosis.
+EOF
+    exit "$EX_NOCONFIG"
+  fi
+}
+
+# Minimal JSON string-field reader. Used only for our own small config file and
+# for pulling single scalars out of API responses, so a full parser is not
+# warranted and jq is deliberately not a dependency.
+json_field() {
+  local blob="$1" key="$2"
+  printf '%s' "$blob" \
+    | tr -d '\n' \
+    | sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+    | head -n 1
+}
+
+json_number() {
+  local blob="$1" key="$2"
+  printf '%s' "$blob" \
+    | tr -d '\n' \
+    | sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" \
+    | head -n 1
+}
+
+json_bool_true() {
+  local blob="$1" key="$2"
+  printf '%s' "$blob" | tr -d '\n' | grep -q "\"${key}\"[[:space:]]*:[[:space:]]*true"
+}
+
+# --------------------------------------------------------------------------
+# HTTP
+# --------------------------------------------------------------------------
+
+# Performs the request and splits the response body from the status code.
+# Sets HTTP_STATUS and HTTP_BODY. The Authorization header is passed via a
+# header file on stdin rather than argv so the token never appears in `ps`.
+HTTP_STATUS=""
+HTTP_BODY=""
+request() {
+  local method="$1" path="$2"; shift 2
+  local url
+
+  case "$path" in
+    http://*|https://*) url="$path" ;;
+    /*)                 url="${DD_URL}${path}" ;;
+    *)                  url="${DD_URL}/${path}" ;;
+  esac
+
+  log "$method $url"
+
+  local raw
+  raw="$(
+    printf 'header = "Authorization: Token %s"\n' "$DD_TOKEN" \
+      | curl --silent --show-error --location \
+             --config - \
+             --request "$method" \
+             --header 'Accept: application/json' \
+             --header 'User-Agent: defectdojo-claude-code-plugin' \
+             --write-out '\ndd_http_status:%{http_code}' \
+             "$@" \
+             "$url" 2>&1
+  )"
+
+  HTTP_STATUS="$(printf '%s' "$raw" | tail -n 1 | sed -n 's/^dd_http_status://p')"
+  HTTP_BODY="$(printf '%s' "$raw" | sed '$d')"
+
+  if [ -z "$HTTP_STATUS" ]; then
+    printf 'dd-api: could not reach %s\n' "$DD_URL" >&2
+    printf '%s\n' "$HTTP_BODY" | sed 's/Token [A-Za-z0-9]*/Token [redacted]/g' >&2
+    exit "$EX_HTTP"
+  fi
+}
+
+# Translates HTTP status into the contractual exit codes with guidance that
+# tells the user what to actually do about it.
+check_status() {
+  case "$HTTP_STATUS" in
+    2*) return 0 ;;
+    401)
+      cat >&2 <<'EOF'
+dd-api: DefectDojo rejected the API token (HTTP 401).
+
+DefectDojo API tokens can expire. Generate a fresh one from your user profile
+in DefectDojo, then update it with /plugin (configure defectdojo-connect) and
+start a new session. Do not retry with the same token.
+EOF
+      exit "$EX_AUTH" ;;
+    403)
+      cat >&2 <<'EOF'
+dd-api: DefectDojo refused this action for your user (HTTP 403).
+
+Your token is valid but your DefectDojo role does not permit this operation on
+this object. Ask a DefectDojo administrator for the required product or global
+role, or perform the action as a user who has it.
+EOF
+      exit "$EX_AUTH" ;;
+    404)
+      printf 'dd-api: not found (HTTP 404): %s\n' "${HTTP_BODY:0:400}" >&2
+      exit "$EX_HTTP" ;;
+    *)
+      printf 'dd-api: DefectDojo returned HTTP %s\n%s\n' "$HTTP_STATUS" "${HTTP_BODY:0:800}" >&2
+      exit "$EX_HTTP" ;;
+  esac
+}
+
+# --------------------------------------------------------------------------
+# Pro edition gate
+# --------------------------------------------------------------------------
+
+# This plugin supports DefectDojo Pro only and must refuse to operate against
+# DefectDojo open source rather than half-working against it.
+#
+# The probe is GET /api/mcp/defectdojo_information/version/. The entire
+# /api/mcp/ router is a Pro-only surface, so an open source instance has no
+# such route and answers 404. A Pro instance answers 200 with a version.
+#
+# The result is cached per instance URL because it cannot change without the
+# instance itself being replaced, and re-probing on every call would add a
+# round trip to every skill action.
+edition_cache_file() {
+  local key
+  key="$(printf '%s' "$DD_URL" | tr -c 'A-Za-z0-9' '_')"
+  printf '%s/edition_%s' "$DD_CACHE_DIR" "$key"
+}
+
+refuse_open_source() {
+  cat >&2 <<EOF
+dd-api: ${DD_URL} is not a DefectDojo Pro instance.
+
+The DefectDojo plugin for Claude Code requires DefectDojo Pro. It does not
+support DefectDojo open source, and it will not fall back to a reduced mode.
+
+The Pro API surface this plugin depends on (/api/mcp/) is not present on this
+instance. If you believe this instance is Pro, confirm the URL points at the
+Pro deployment and that you can reach it, then run the connection doctor.
+
+To evaluate DefectDojo Pro, start a two-week SaaS trial at https://defectdojo.com.
+EOF
+  exit "$EX_NOTPRO"
+}
+
+# There is deliberately no flag, environment variable or configuration setting
+# that disables this check. The Pro requirement is a product boundary, not a
+# preference, and an opt-out would make it one.
+assert_pro() {
+  local cache
+  cache="$(edition_cache_file)"
+  if [ -r "$cache" ] && [ "$(cat "$cache" 2>/dev/null)" = "pro" ]; then
+    log "edition: pro (cached)"
+    return 0
+  fi
+
+  request GET /api/mcp/defectdojo_information/version/
+  case "$HTTP_STATUS" in
+    2*)
+      mkdir -p "$DD_CACHE_DIR" 2>/dev/null && printf 'pro' > "$cache"
+      log "edition: pro ($(json_field "$HTTP_BODY" version))"
+      return 0 ;;
+    401|403)
+      # Credentials are the problem, not the edition. Report it as such.
+      check_status ;;
+    404|405)
+      refuse_open_source ;;
+    *)
+      printf 'dd-api: could not verify that %s is DefectDojo Pro (HTTP %s).\n' "$DD_URL" "$HTTP_STATUS" >&2
+      printf 'This plugin requires DefectDojo Pro. Run the connection doctor to diagnose.\n' >&2
+      exit "$EX_NOTPRO" ;;
+  esac
+}
+
+# --------------------------------------------------------------------------
+# Commands
+# --------------------------------------------------------------------------
+
+cmd_config() {
+  printf 'instance:     %s\n' "$DD_URL"
+  printf 'token source: %s\n' "${DD_TOKEN_SOURCE:-none}"
+  printf 'token:        [redacted, %s characters]\n' "${#DD_TOKEN}"
+  printf 'edition gate: enforced (DefectDojo Pro required)\n'
+}
+
+cmd_whoami() {
+  assert_pro
+  request GET /api/v2/user_profile/
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+cmd_version() {
+  assert_pro
+  request GET /api/mcp/defectdojo_information/version/
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+cmd_feature_flags() {
+  assert_pro
+  request GET /api/mcp/defectdojo_information/feature_flags/
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+cmd_http() {
+  local method="$1" path="${2:-}"; shift 2 || true
+  [ -n "$path" ] || die "dd-api: $(printf '%s' "$method" | tr '[:upper:]' '[:lower:]') needs a path, for example /api/v2/findings/?limit=5" "$EX_USAGE"
+  assert_pro
+  case "$method" in
+    GET|DELETE) request "$method" "$path" "$@" ;;
+    *)          request "$method" "$path" --header 'Content-Type: application/json' "$@" ;;
+  esac
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+# Finding write helpers. These exist so skills do not have to remember which
+# operations are custom actions and which are plain field updates.
+cmd_close_finding() {
+  local id="${1:-}"; shift || true
+  [ -n "$id" ] || die "dd-api: close-finding needs a finding id" "$EX_USAGE"
+  local note=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --note) note="${2:-}"; shift 2 ;;
+      *) die "dd-api: unknown option for close-finding: $1" "$EX_USAGE" ;;
+    esac
+  done
+  assert_pro
+  [ -n "$note" ] && add_note "$id" "$note"
+  request POST "/api/v2/findings/${id}/close/" --header 'Content-Type: application/json' --data '{}'
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+cmd_verify_finding() {
+  local id="${1:-}"
+  [ -n "$id" ] || die "dd-api: verify-finding needs a finding id" "$EX_USAGE"
+  assert_pro
+  request POST "/api/v2/findings/${id}/verify/" --header 'Content-Type: application/json' --data '{}'
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+json_escape() {
+  printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null \
+    || printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' ')"
+}
+
+# Prints the created note so the caller can see the write landed. When a note
+# accompanies a status change, both responses are emitted in order, otherwise a
+# skill cannot report the note without assuming it succeeded.
+add_note() {
+  local id="$1" body="$2"
+  request POST "/api/v2/findings/${id}/notes/" \
+    --header 'Content-Type: application/json' \
+    --data "{\"entry\": $(json_escape "$body")}"
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+cmd_note() {
+  local id="${1:-}" body="${2:-}"
+  { [ -n "$id" ] && [ -n "$body" ]; } || die "dd-api: note needs a finding id and note text" "$EX_USAGE"
+  assert_pro
+  add_note "$id" "$body"
+}
+
+# --------------------------------------------------------------------------
+# Import and reimport
+# --------------------------------------------------------------------------
+
+# DefectDojo Pro may run an import synchronously or in the background. The
+# request can ask for one or the other, but the instance-wide api_async_import
+# setting can force background mode regardless of what was asked. The response
+# is therefore the only authority: branch on its background_import field, never
+# on what was requested.
+run_import() {
+  local endpoint="$1"; shift
+  local file="" poll=1 timeout=600
+  local -a form=()
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --file)       file="${2:-}"; shift 2 ;;
+      --no-poll)    poll=0; shift ;;
+      --timeout)    timeout="${2:-600}"; shift 2 ;;
+      --*)
+        # Everything else is passed through as a multipart field, so any
+        # current or future API parameter works without changing this script.
+        local name="${1#--}"
+        form+=(--form "${name}=${2:-}")
+        shift 2 ;;
+      *) die "dd-api: unexpected argument: $1" "$EX_USAGE" ;;
+    esac
+  done
+
+  [ -n "$file" ] || die "dd-api: import needs --file <path to scan output>" "$EX_USAGE"
+  [ -r "$file" ] || die "dd-api: cannot read file: $file" "$EX_USAGE"
+
+  assert_pro
+  request POST "$endpoint" --form "file=@${file}" "${form[@]}"
+  check_status
+
+  local test_id background
+  test_id="$(json_number "$HTTP_BODY" test_id)"
+  [ -z "$test_id" ] && test_id="$(json_number "$HTTP_BODY" test)"
+
+  if json_bool_true "$HTTP_BODY" background_import; then
+    background=1
+  else
+    background=0
+  fi
+
+  printf '%s\n' "$HTTP_BODY"
+
+  if [ "$background" -eq 1 ]; then
+    printf '\ndd-api: DefectDojo accepted this scan for background processing (test %s).\n' "${test_id:-unknown}" >&2
+    if [ "$poll" -eq 1 ] && [ -n "$test_id" ]; then
+      poll_test_status "$test_id" "$timeout"
+    else
+      printf 'dd-api: not waiting. Track progress at %s/test/%s\n' "$DD_URL" "${test_id:-}" >&2
+    fi
+  fi
+}
+
+# Background imports move an enhanced test through Processing and one or more
+# Post Processing states before reaching Processed or Failed.
+poll_test_status() {
+  local test_id="$1" timeout="$2"
+  local waited=0 interval=2 status=""
+
+  printf 'dd-api: waiting for import to finish (up to %ss)\n' "$timeout" >&2
+  while [ "$waited" -lt "$timeout" ]; do
+    request GET "/api/v2/tests/${test_id}/"
+    check_status
+    status="$(json_field "$HTTP_BODY" status)"
+
+    case "$status" in
+      Processed)
+        printf 'dd-api: import finished. Findings are available at %s/test/%s\n' "$DD_URL" "$test_id" >&2
+        return 0 ;;
+      Failed)
+        printf 'dd-api: import FAILED. Inspect it at %s/test/%s\n' "$DD_URL" "$test_id" >&2
+        exit "$EX_HTTP" ;;
+      *)
+        log "status: ${status:-unknown} (${waited}s)" ;;
+    esac
+
+    sleep "$interval"
+    waited=$((waited + interval))
+    [ "$interval" -lt 15 ] && interval=$((interval + 2))
+  done
+
+  printf 'dd-api: import did not finish within %ss. It is still running on the server.\n' "$timeout" >&2
+  printf 'dd-api: track it at %s/test/%s\n' "$DD_URL" "$test_id" >&2
+  exit "$EX_TIMEOUT"
+}
+
+cmd_import_status() {
+  local test_id="${1:-}"
+  [ -n "$test_id" ] || die "dd-api: import-status needs a test id" "$EX_USAGE"
+  assert_pro
+  request GET "/api/v2/tests/${test_id}/"
+  check_status
+  printf '%s\n' "$HTTP_BODY"
+}
+
+usage() {
+  cat <<'EOF'
+dd-api: REST bridge to DefectDojo Pro. Requires DefectDojo Pro.
+
+  dd-api config                     show instance and credential source (never the token)
+  dd-api whoami                     verify credentials, print the current user profile
+  dd-api version                    DefectDojo Pro version
+  dd-api feature-flags              feature flags visible to this user
+
+  dd-api get <path> [curl args]     GET  e.g. dd-api get "/api/v2/findings/?limit=5&severity=Critical"
+  dd-api post <path> [curl args]    POST e.g. dd-api post /api/v2/findings/ --data '{...}'
+  dd-api patch <path> [curl args]   PATCH
+  dd-api put <path> [curl args]     PUT
+  dd-api delete <path> [curl args]  DELETE
+
+  dd-api close-finding <id> [--note "text"]   close a finding, optionally with a note
+  dd-api verify-finding <id>                  mark a finding verified
+  dd-api note <id> "text"                     add a note to a finding
+
+  dd-api import   --file <path> --scan-type "<type>" [--product-name ... --engagement-name ...]
+  dd-api reimport --file <path> --scan-type "<type>" [--test <id> | --product-name ... ]
+  dd-api import-status <test id>
+
+  Import options: --no-poll to return immediately, --timeout <seconds> (default 600).
+  Any other --name value pair is sent as a form field, so all API parameters work,
+  for example --auto_create_context true --close_old_findings true.
+
+Environment overrides: DD_BASE_URL, DD_API_TOKEN, DD_CONFIG_FILE.
+Exit codes: 2 usage, 3 not configured, 4 auth, 5 not Pro, 6 http, 7 import timeout.
+EOF
+}
+
+main() {
+  local cmd="${1:-}"; shift || true
+  case "$cmd" in
+    -v|--verbose) VERBOSE=1; main "$@"; return $? ;;
+    ""|-h|--help|help) usage; exit 0 ;;
+  esac
+
+  load_config
+
+  case "$cmd" in
+    config)         cmd_config ;;
+    whoami)         cmd_whoami ;;
+    version)        cmd_version ;;
+    feature-flags)  cmd_feature_flags ;;
+    get)            cmd_http GET "$@" ;;
+    post)           cmd_http POST "$@" ;;
+    patch)          cmd_http PATCH "$@" ;;
+    put)            cmd_http PUT "$@" ;;
+    delete)         cmd_http DELETE "$@" ;;
+    close-finding)  cmd_close_finding "$@" ;;
+    verify-finding) cmd_verify_finding "$@" ;;
+    note)           cmd_note "$@" ;;
+    import)         run_import /api/v2/import-scan/ "$@" ;;
+    reimport)       run_import /api/v2/reimport-scan/ "$@" ;;
+    import-status)  cmd_import_status "$@" ;;
+    *)              printf 'dd-api: unknown command: %s\n\n' "$cmd" >&2; usage >&2; exit "$EX_USAGE" ;;
+  esac
+}
+
+main "$@"

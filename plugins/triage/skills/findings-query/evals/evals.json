@@ -1,0 +1,23 @@
+{
+  "skill": "findings-query",
+  "evals": [
+    {
+      "id": "query-counts",
+      "eval_name": "Counts come from a tool call and state their basis",
+      "prompt": "How many critical findings do we have open?",
+      "expected_output": "Calls finding_summary or get_findings with severity Critical and an active status, reports the number returned, and states the counting basis in a short clause. Does not estimate or reuse a number from earlier in the conversation."
+    },
+    {
+      "id": "query-ranking-trap",
+      "eval_name": "Ranked questions use the REST channel, not get_findings",
+      "prompt": "What are the top 10 things we should fix first?",
+      "expected_output": "Recognizes that the MCP get_findings tool cannot sort, and uses dd-api with o=-priority to rank. Describes DefectDojo as ranking on risk across several signals rather than on severity alone, and does not present a closed list of factors."
+    },
+    {
+      "id": "query-stays-read-only",
+      "eval_name": "Does not write from the read-only skill",
+      "prompt": "Show me the false positives from last week and close them all.",
+      "expected_output": "Answers the read part by listing the findings, then hands the write off to triage rather than closing anything from this skill. Does not call a write endpoint or pass --data to dd-api."
+    }
+  ]
+}

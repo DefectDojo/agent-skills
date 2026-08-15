@@ -1,0 +1,166 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            jq -e . "$f" > /dev/null || { echo "invalid JSON: $f"; fail=1; }
+          done < <(find . -name '*.json' -not -path './.git/*')
+          exit $fail
+
+      - name: Check version lockstep
+        run: |
+          want="$(cat VERSION)"
+          fail=0
+          while IFS= read -r f; do
+            got="$(jq -r '.version // empty' "$f")"
+            if [ "$got" != "$want" ]; then
+              echo "version mismatch in $f: found '${got:-none}', VERSION says '$want'"
+              fail=1
+            fi
+          done < <(find plugins -name plugin.json)
+          exit $fail
+
+      - name: Check marketplace entries resolve
+        run: |
+          fail=0
+          root="$(jq -r '.metadata.pluginRoot // "."' .claude-plugin/marketplace.json)"
+          while IFS= read -r src; do
+            path="$root/$src/.claude-plugin/plugin.json"
+            [ -f "$path" ] || { echo "marketplace entry points at missing plugin: $path"; fail=1; }
+          done < <(jq -r '.plugins[].source' .claude-plugin/marketplace.json)
+          exit $fail
+
+      - name: Shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck plugins/connect/bin/dd-api \
+                     plugins/connect/bin/dd-link \
+                     plugins/connect/hooks/write-config.sh \
+                     tests/test_dd_api.sh
+
+      - name: Executable bits
+        run: |
+          fail=0
+          for f in plugins/connect/bin/dd-api plugins/connect/bin/dd-link \
+                   plugins/connect/hooks/write-config.sh tests/test_dd_api.sh; do
+            [ -x "$f" ] || { echo "not executable: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: Behavioral tests
+        run: ./tests/test_dd_api.sh
+
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Project rules that are easy to break by accident and expensive to
+      # notice later. Each one has a reason.
+      #
+      # Every check excludes this workflow file, otherwise the patterns match
+      # their own definitions here and the job fails on itself.
+      - name: Policy checks
+        run: |
+          fail=0
+          SELF=.github/workflows/validate.yml
+          scan() { grep -rn --exclude-dir=.git --exclude="$(basename "$SELF")" "$@" ; }
+
+          # Remediation is a separate product story. This repository must not
+          # imply otherwise, in any file, including docs and skill text.
+          if scan -iE 'sensei' . ; then
+            echo "POLICY: this repository must not reference that product name."
+            fail=1
+          fi
+
+          # DefectDojo authenticates with the Token scheme. Bearer silently
+          # fails against the API and has bitten integrations before. The test
+          # stub is exempt because it asserts that we never send Bearer.
+          if scan --exclude-dir=tests 'Bearer ' . ; then
+            echo "POLICY: DefectDojo uses 'Authorization: Token', never 'Bearer'."
+            fail=1
+          fi
+
+          # userConfig is per-plugin. A user_config reference outside the
+          # connect plugin does not substitute and fails silently at runtime.
+          if scan 'user_config\.' plugins | grep -v '^plugins/connect/' ; then
+            echo "POLICY: user_config may only be referenced inside plugins/connect."
+            fail=1
+          fi
+
+          # The model must never be handed the token, so no skill may name it.
+          if scan 'dd_api_token' plugins/*/skills ; then
+            echo "POLICY: skills must not reference the token setting."
+            fail=1
+          fi
+
+          # A 40-character hex string in this repository is almost certainly a
+          # real API token. Two places legitimately hold one and are excluded:
+          # tests/, whose fixtures are credential-shaped by necessity, and
+          # .gitleaks.toml, whose entire job is to name those fixture values.
+          # Neither is a blind spot: gitleaks scans both in the next step, and
+          # its allowlist matches those literal values rather than those paths.
+          if scan --exclude-dir=tests --exclude=.gitleaks.toml -E '\b[0-9a-f]{40}\b' . ; then
+            echo "POLICY: possible API token committed."
+            fail=1
+          fi
+
+          # House style for DefectDojo written material. Matched as a literal
+          # rather than via grep -P: a grep that errors out returns non-zero,
+          # which this "if" would read as "clean", so a PCRE-less grep would
+          # silently disable the check instead of failing it.
+          if scan -F -e '—' . ; then
+            echo "POLICY: em dashes are not used in DefectDojo material."
+            fail=1
+          fi
+
+          exit $fail
+
+      # The gitleaks CLI is free and open source. Its official Action wrapper is
+      # not: it refuses to run for organization-owned repositories without a
+      # paid licence key. Invoking the binary directly gets the same scan with
+      # no licence and no third-party Action in the supply chain.
+      - name: Secret scan
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          # --no-git scans the working tree, which is what matters here: this
+          # repository's history is short and every commit is reachable from it.
+          ./gitleaks detect --source . --no-git --redact --verbose --exit-code 1
+
+  plugin-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # The same validation the plugin directory's review pipeline runs.
+      - name: Validate marketplace and every plugin
+        run: |
+          fail=0
+          claude plugin validate . --strict || fail=1
+          for d in plugins/*/; do
+            echo "validating $d"
+            claude plugin validate "$d" --strict || fail=1
+          done
+          exit $fail

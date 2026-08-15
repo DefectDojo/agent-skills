@@ -1,0 +1,25 @@
+# gitleaks configuration for the secret scan in CI.
+#
+# The test suite needs credential-shaped strings to exercise dd-api's token
+# handling, and gitleaks correctly flags them as generic API keys. They are
+# allowlisted here by their literal value rather than by file path.
+#
+# That distinction is deliberate: a path allowlist would make tests/ a blind
+# spot where a real credential could hide. Matching the exact placeholder
+# values keeps the scan live everywhere, so a genuine token committed to a test
+# file still fails the build.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic credentials used by the dd-api test suite"
+regexTarget = "match"
+regexes = [
+  # tests/stub_dojo.py and tests/test_dd_api.sh: the token the stub accepts.
+  '''0123456789abcdef0123456789abcdef01234567''',
+  # tests/test_dd_api.sh: a deliberately wrong token, for the 401 path.
+  '''f{40}''',
+  # Documentation placeholders in auth-header examples.
+  '''0{40}''',
+]
