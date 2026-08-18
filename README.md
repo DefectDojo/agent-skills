@@ -114,7 +114,8 @@ The source is published so that customers can read what runs against their
 vulnerability data before they run it. You may install it, use it against a
 DefectDojo Pro instance you are authorized to use, and review the source.
 Modifying it, redistributing it, or adapting it to run against anything other
-than DefectDojo Pro is not permitted.
+than DefectDojo Pro is not permitted. Plugin marketplaces and directories may
+host and distribute it unmodified, so that it can be installed the usual way.
 
 DefectDojo Community Edition is separate and remains open source under its own
 license. This license covers only this repository.
