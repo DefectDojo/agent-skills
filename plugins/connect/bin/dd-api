@@ -337,7 +337,11 @@ cmd_close_finding() {
   done
   assert_pro
   [ -n "$note" ] && add_note "$id" "$note"
-  request POST "/api/v2/findings/${id}/close/" --header 'Content-Type: application/json' --data '{}'
+  # The close action reads is_mitigated straight out of the validated payload,
+  # so an empty body is a server error (KeyError), not a validation error.
+  # Closing means mitigated; the other flags (false_p, out_of_scope, duplicate)
+  # are separate triage outcomes with their own helpers and default to false.
+  request POST "/api/v2/findings/${id}/close/" --header 'Content-Type: application/json' --data '{"is_mitigated": true}'
   check_status
   printf '%s\n' "$HTTP_BODY"
 }

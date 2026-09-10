@@ -40,3 +40,8 @@ First release.
   `product_name` and `scan_type`. They were passed through verbatim, which the
   importer ignores before reporting the field as missing; found in the same live
   run. The stub now validates field names so the mapping cannot regress.
+- `close-finding` sends `{"is_mitigated": true}`. The close action reads that
+  field without a default, so the empty body it used to send was an HTTP 500 on
+  a real instance. The stub now requires the field. Also verified live in that
+  run: `verify-finding`, `note`, every insights collection the report skill
+  uses, `dd-link`, and the priority field arriving on imported findings.

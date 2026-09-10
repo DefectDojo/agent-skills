@@ -124,6 +124,15 @@ class Handler(BaseHTTPRequestHandler):
             })
 
         if path.endswith("/close/"):
+            # The real close view indexes validated_data["is_mitigated"] without a
+            # default, so a body that omits it is a 500 in production. Refuse it
+            # here so dd-api can never regress to posting an empty object.
+            try:
+                payload = json.loads(body or b"{}")
+            except ValueError:
+                payload = {}
+            if "is_mitigated" not in payload:
+                return self._send(400, {"is_mitigated": ["This field is required."]})
             return self._send(200, {"id": 4711, "active": False, "is_mitigated": True})
         if path.endswith("/verify/"):
             return self._send(200, {"id": 4711, "verified": True})
