@@ -164,6 +164,10 @@ start_stub pro
 write_config "$DD_BASE_URL" "$VALID_TOKEN"
 clear_cache
 printf '{"findings": []}' > "$WORK_DIR/scan.json"
+# Verified against a live Pro instance: the importer wants snake_case field names
+# and the stub now refuses anything else, so this proves the documented
+# hyphenated flags are translated rather than passed through verbatim.
+expect_exit      "hyphenated context flags reach the API as snake_case" 0 "$DD_API" import --file "$WORK_DIR/scan.json" --scan-type "Generic Findings Import" --product-name "Smoke Product" --engagement-name "Smoke Engagement" --auto_create_context true
 expect_exit      "synchronous import succeeds"                0 "$DD_API" import --file "$WORK_DIR/scan.json" --scan-type "Generic Findings Import"
 expect_not_contains "synchronous import does not wait"        "waiting for import" "$DD_API" import --file "$WORK_DIR/scan.json" --scan-type "Generic Findings Import"
 expect_exit      "import without a file is a usage error"     2 "$DD_API" import --scan-type "Generic Findings Import"

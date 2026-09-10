@@ -36,3 +36,7 @@ First release.
   not an accepted `o` ordering value (HTTP 400), so the skills bound with
   `priority_min` and order the page client-side. The test stub rejects
   `o=-priority` the same way the real API does.
+- Import flags such as `--product-name` and `--scan-type` are sent to the API as
+  `product_name` and `scan_type`. They were passed through verbatim, which the
+  importer ignores before reporting the field as missing; found in the same live
+  run. The stub now validates field names so the mapping cannot regress.

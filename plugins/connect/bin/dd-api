@@ -397,7 +397,12 @@ run_import() {
       --*)
         # Everything else is passed through as a multipart field, so any
         # current or future API parameter works without changing this script.
+        # The API reads snake_case names and silently ignores anything else, so
+        # the documented hyphenated flags (--product-name, --scan-type) have to
+        # arrive as product_name and scan_type or the import fails with
+        # "product_name parameter missing" against a real instance.
         local name="${1#--}"
+        name="${name//-/_}"
         form+=(--form "${name}=${2:-}")
         shift 2 ;;
       *) die "dd-api: unexpected argument: $1" "$EX_USAGE" ;;

@@ -18,6 +18,7 @@ passing.
 """
 
 import json
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -96,13 +97,21 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         length = int(self.headers.get("Content-Length") or 0)
-        if length:
-            self.rfile.read(length)
+        body = self.rfile.read(length) if length else b""
 
         if not self._auth_ok():
             return self._send(401, {"detail": "Invalid token."})
 
         if path in ("/api/v2/import-scan/", "/api/v2/reimport-scan/"):
+            # The real importer reads snake_case form fields and silently ignores
+            # anything else, then complains that the field is missing. Mirror the
+            # two checks that bit in a live smoke test so a flag-name regression
+            # in dd-api fails here instead of against a customer's instance.
+            fields = set(re.findall(rb'name="([^"]+)"', body))
+            if b"scan_type" not in fields:
+                return self._send(400, ["scan_type parameter missing"])
+            if b"auto_create_context" in fields and b"product_name" not in fields and b"test" not in fields:
+                return self._send(400, ["product_name parameter missing"])
             background = MODE in ("pro-async", "pro-failing")
             return self._send(201, {
                 "test": 77,
