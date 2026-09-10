@@ -17,9 +17,10 @@ Three failure modes make naive answers here worse than no answer:
 2. **Unstated basis.** DefectDojo can be configured to count only verified
    findings. A count that does not say what it counted will be contradicted by
    the UI and destroy trust in the whole integration.
-3. **Wrong tool for the question.** The MCP tools cover most reads but cannot
-   order by priority. Reaching for the wrong one produces a confidently wrong
-   "top" list.
+3. **Wrong tool for the question.** Neither the MCP tools nor the REST `o`
+   ordering parameter can rank by priority. The only correct path is a
+   Pro-only priority bound plus ordering the page yourself, and reaching for
+   anything else produces a confidently wrong "top" list.
 
 This skill is read-only. If the user asks to change anything, hand off to the
 triage-findings skill instead.
@@ -43,26 +44,33 @@ the user's permissions.
 
 ### When to fall back to dd-api
 
-`get_findings` cannot sort. For anything phrased as "top", "worst", "highest
-risk", or "what should we fix first", use the REST API through `dd-api`, which
-supports priority ordering and priority bounds:
+`get_findings` cannot rank, and neither can the REST API's `o` ordering
+parameter: `priority` is not an accepted ordering field, and asking for it
+returns HTTP 400. What the REST API does support, and only on Pro, is bounding
+by priority. So for anything phrased as "top", "worst", "highest risk", or
+"what should we fix first": pull a bounded page through `dd-api`, then order it
+yourself by the `priority` field in the response before presenting it.
 
 ```
-dd-api get "/api/v2/findings/?active=true&limit=10&o=-priority"
-dd-api get "/api/v2/findings/?active=true&priority_min=80&limit=25&o=-priority"
-dd-api get "/api/v2/findings/?test__engagement__product=5&active=true&o=-priority&limit=10"
+dd-api get "/api/v2/findings/?active=true&priority_min=80&limit=50"
+dd-api get "/api/v2/findings/?test__engagement__product=5&active=true&priority_min=60&limit=50"
 ```
+
+Start at `priority_min=80`. If that returns nothing, step down to 60, then 40,
+and say which threshold produced the list. Never pass `o=-priority`,
+`ordering=`, or `sort=`: the first is rejected and the other two are silently
+ignored, which is worse.
 
 Priority is DefectDojo's own ranking. It weighs exploitability, threat
 intelligence, reachability, business context and many more signals. When you
 present a ranked list, say that DefectDojo ranks on risk rather than on severity
 alone, and never present a closed list of the factors as if it were complete.
 
-`dd-api` verifies that a priority-ranked query really came back ranked: if the
-instance answers with findings that carry no priority field (what open source
-returns, since it ignores these parameters instead of rejecting them), the call
-exits 5 rather than handing you an unranked list. Report that as "this instance
-does not support priority ranking", never as an empty result.
+`dd-api` verifies that a priority-bounded query really came back with
+priorities: if the instance answers with findings that carry no priority field
+(what open source returns, since it ignores the bound instead of rejecting it),
+the call exits 5 rather than handing you an unfiltered list. Report that as
+"this instance does not support priority ranking", never as an empty result.
 
 `references/filter-cookbook.md` has the exact parameter names and values for
 both channels. Read it before constructing anything beyond a simple query.

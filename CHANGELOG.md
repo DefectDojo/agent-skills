@@ -27,3 +27,12 @@ First release.
   DefectDojo open source rather than partially working.
 - Behavioral test suite for `dd-api` covering the Pro path, open source refusal,
   expired credentials, and synchronous, background, and failing imports.
+- Priority semantics check in `dd-api`: a findings query that asks for the
+  Pro-only priority bound refuses an answer that carries no `priority` field,
+  which is what open source returns because it ignores the parameter instead of
+  rejecting it. A defeated edition check therefore fails loudly rather than
+  presenting an unfiltered list as a ranked one.
+- Ranking recipe verified against a live DefectDojo Pro instance: `priority` is
+  not an accepted `o` ordering value (HTTP 400), so the skills bound with
+  `priority_min` and order the page client-side. The test stub rejects
+  `o=-priority` the same way the real API does.

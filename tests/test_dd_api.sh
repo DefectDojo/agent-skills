@@ -146,13 +146,16 @@ printf '\n== Priority semantics ==\n'
 start_stub pro
 write_config "$DD_BASE_URL" "$VALID_TOKEN"
 clear_cache
-expect_exit      "ranked query passes when priority is present"  0 "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
-expect_contains  "ranked response carries the priority field"    '"priority"' "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
+expect_exit      "bounded query passes when priority is present" 0 "$DD_API" get "/api/v2/findings/?active=true&priority_min=80&limit=5"
+expect_contains  "bounded response carries the priority field"   '"priority"' "$DD_API" get "/api/v2/findings/?active=true&priority_min=80&limit=5"
+# Verified against a live Pro instance: priority is not an ordering choice.
+expect_exit      "o=-priority is rejected like the real API"     6 "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
+expect_contains  "the rejection names the bad choice"            "not one of the available choices" "$DD_API" get "/api/v2/findings/?o=-priority"
 
 start_stub no-priority
 write_config "$DD_BASE_URL" "$VALID_TOKEN"
 clear_cache
-expect_exit      "unranked answer to a ranked query exits 5"     5 "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
+expect_exit      "unbounded answer to a bounded query exits 5"   5 "$DD_API" get "/api/v2/findings/?active=true&priority_min=80&limit=5"
 expect_contains  "the refusal explains the missing ranking"      "without the priority field" "$DD_API" get "/api/v2/findings/?priority_min=80&active=true"
 expect_exit      "plain findings query still passes"             0 "$DD_API" get "/api/v2/findings/?limit=5"
 

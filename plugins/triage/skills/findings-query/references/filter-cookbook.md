@@ -55,17 +55,24 @@ and `get_roles` take only `limit` and `offset`. `get_users` also takes
 
 ## REST through dd-api
 
-Use this channel when you need ordering, priority bounds, or a filter the MCP
-tools do not expose.
+Use this channel when you need priority bounds, ordering by a supported field,
+or a filter the MCP tools do not expose.
 
 ### Ranking
 
 ```
-dd-api get "/api/v2/findings/?active=true&o=-priority&limit=10"
+dd-api get "/api/v2/findings/?active=true&priority_min=80&limit=50"
 ```
 
-`o` is the ordering parameter. Prefix with `-` for descending. `priority` is
-DefectDojo's computed risk ranking. `priority_min` and `priority_max` bound it.
+`priority` is DefectDojo's computed risk ranking, a number where higher means
+fix sooner. `priority_min` and `priority_max` bound it, and both are Pro-only.
+The response carries `priority` on every finding: order the page by it yourself
+before presenting, descending.
+
+`o` is the ordering parameter for other fields (`-` prefix for descending),
+for example `o=-created` or `o=numerical_severity`. `priority` is **not** an
+accepted `o` value and returns HTTP 400. `ordering=` and `sort=` are not
+parameters at all and are silently ignored.
 
 ### Common filters
 
@@ -82,10 +89,11 @@ DefectDojo's computed risk ranking. `priority_min` and `priority_max` bound it.
 
 ### Worked examples
 
-Top ten by risk across the program:
+Top ten by risk across the program (fetch the high band, then order by
+`priority` yourself and keep the first ten):
 
 ```
-dd-api get "/api/v2/findings/?active=true&o=-priority&limit=10"
+dd-api get "/api/v2/findings/?active=true&priority_min=80&limit=50"
 ```
 
 Everything critical and unverified in one product:
@@ -100,10 +108,11 @@ Findings that mention a component:
 dd-api get "/api/v2/findings/?component_name__icontains=lodash&active=true"
 ```
 
-High priority only:
+High priority only, newest first (a supported ordering combined with the
+Pro-only bound):
 
 ```
-dd-api get "/api/v2/findings/?priority_min=80&active=true&o=-priority"
+dd-api get "/api/v2/findings/?priority_min=80&active=true&o=-created"
 ```
 
 ## Counting basis

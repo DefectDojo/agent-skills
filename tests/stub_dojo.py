@@ -20,6 +20,7 @@ passing.
 import json
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 MODE = "pro"
 VALID_TOKEN = "0123456789abcdef0123456789abcdef01234567"
@@ -78,6 +79,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"id": 77, "status": status})
 
         if path == "/api/v2/findings/":
+            # Both editions validate `o` against a fixed choice list that does not
+            # include priority, so the real API answers 400 here. Mirroring that
+            # keeps the skills honest about which channel can rank.
+            query = parse_qs(urlparse(self.path).query)
+            bad = [v for v in query.get("o", []) if v.lstrip("-") == "priority"]
+            if bad:
+                return self._send(400, {"o": [f"Select a valid choice. {bad[0]} is not one of the available choices."]})
             finding = {"id": 4711, "title": "SQL Injection"}
             if MODE != "no-priority":
                 finding["priority"] = 92
