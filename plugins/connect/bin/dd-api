@@ -279,6 +279,37 @@ cmd_feature_flags() {
   printf '%s\n' "$HTTP_BODY"
 }
 
+# The edition gate above is a probe, and a probe can be defeated. This check is
+# semantic: the priority field only exists on Pro, and DefectDojo open source
+# ignores query parameters it does not recognise instead of rejecting them, so a
+# priority-ranked findings query against open source "succeeds" with the ranking
+# silently not applied. A caller who asked for priority semantics must not be
+# handed an unranked list that looks ranked, so when the response carries
+# findings, at least the first one has to prove the field exists.
+verify_priority_semantics() {
+  local path="$1"
+  case "$path" in
+    *"/api/v2/findings/"*priority*) ;;
+    *) return 0 ;;
+  esac
+  # An empty result set is no evidence either way.
+  printf '%s' "$HTTP_BODY" | tr -d ' \n' | grep -q '"results":\[\]' && return 0
+  printf '%s' "$HTTP_BODY" | tr -d '\n' | grep -q '"priority"[[:space:]]*:' && return 0
+  cat >&2 <<EOF
+dd-api: ${DD_URL} returned findings without the priority field.
+
+This query asked for DefectDojo Pro priority semantics (ordering or bounds on
+the computed priority), and the instance answered with findings that carry no
+priority at all. DefectDojo open source ignores those parameters rather than
+rejecting them, so this response is an unranked list, not the ranking you asked
+for. Refusing to return it as if it were ranked.
+
+This plugin requires DefectDojo Pro. If this instance is Pro, its version
+predates priority scoring; upgrade it, then retry.
+EOF
+  exit "$EX_NOTPRO"
+}
+
 cmd_http() {
   local method="$1" path="${2:-}"; shift 2 || true
   [ -n "$path" ] || die "dd-api: $(printf '%s' "$method" | tr '[:upper:]' '[:lower:]') needs a path, for example /api/v2/findings/?limit=5" "$EX_USAGE"
@@ -288,6 +319,7 @@ cmd_http() {
     *)          request "$method" "$path" --header 'Content-Type: application/json' "$@" ;;
   esac
   check_status
+  [ "$method" = "GET" ] && verify_priority_semantics "$path"
   printf '%s\n' "$HTTP_BODY"
 }
 

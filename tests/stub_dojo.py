@@ -8,6 +8,8 @@ Modes:
   pro-async    Pro instance, valid token, background import that finishes
   pro-failing  Pro instance, background import that ends in Failed
   oss          open source instance: /api/mcp/ does not exist (404)
+  no-priority  passes the Pro probe but serves findings without the priority
+               field, the shape a defeated edition gate sees against open source
   expired      Pro instance that rejects the token with 401
 
 The stub asserts the auth header format itself, so a regression to "Bearer"
@@ -76,7 +78,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"id": 77, "status": status})
 
         if path == "/api/v2/findings/":
-            return self._send(200, {"count": 1, "results": [{"id": 4711, "title": "SQL Injection"}]})
+            finding = {"id": 4711, "title": "SQL Injection"}
+            if MODE != "no-priority":
+                finding["priority"] = 92
+            return self._send(200, {"count": 1, "results": [finding]})
 
         return self._send(404, {"detail": "Not found."})
 

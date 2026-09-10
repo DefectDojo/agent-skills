@@ -138,6 +138,24 @@ write_config "$DD_BASE_URL" "$VALID_TOKEN"
 clear_cache
 expect_exit      "401 during the edition probe reports auth, not edition" 4 "$DD_API" whoami
 
+# The semantic layer of the gate: a priority-ranked findings query must refuse
+# an answer that carries no priority field, because that is what open source
+# returns when the probe has been defeated (it ignores the ranking parameters
+# instead of rejecting them).
+printf '\n== Priority semantics ==\n'
+start_stub pro
+write_config "$DD_BASE_URL" "$VALID_TOKEN"
+clear_cache
+expect_exit      "ranked query passes when priority is present"  0 "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
+expect_contains  "ranked response carries the priority field"    '"priority"' "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
+
+start_stub no-priority
+write_config "$DD_BASE_URL" "$VALID_TOKEN"
+clear_cache
+expect_exit      "unranked answer to a ranked query exits 5"     5 "$DD_API" get "/api/v2/findings/?active=true&o=-priority&limit=5"
+expect_contains  "the refusal explains the missing ranking"      "without the priority field" "$DD_API" get "/api/v2/findings/?priority_min=80&active=true"
+expect_exit      "plain findings query still passes"             0 "$DD_API" get "/api/v2/findings/?limit=5"
+
 printf '\n== Import handling ==\n'
 start_stub pro
 write_config "$DD_BASE_URL" "$VALID_TOKEN"

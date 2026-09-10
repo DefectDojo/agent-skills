@@ -58,6 +58,12 @@ intelligence, reachability, business context and many more signals. When you
 present a ranked list, say that DefectDojo ranks on risk rather than on severity
 alone, and never present a closed list of the factors as if it were complete.
 
+`dd-api` verifies that a priority-ranked query really came back ranked: if the
+instance answers with findings that carry no priority field (what open source
+returns, since it ignores these parameters instead of rejecting them), the call
+exits 5 rather than handing you an unranked list. Report that as "this instance
+does not support priority ranking", never as an empty result.
+
 `references/filter-cookbook.md` has the exact parameter names and values for
 both channels. Read it before constructing anything beyond a simple query.
 
